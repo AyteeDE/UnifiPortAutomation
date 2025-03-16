@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace UnifiPortAutomation.Connections.Unifi;
 
@@ -69,7 +70,49 @@ public class UnifiAPIConnection : IAsyncDisposable
             Console.WriteLine(ex.Message);
         }
     }
-
+    public async Task<UnifiAPIResponse> GetPortForwardingsAsync()
+    {
+        string url = $"https://{_host}/proxy/network/api/s/default/rest/portforward";
+        var client = new CustomHttpClient();
+        client.DefaultRequestHeaders.Add("Cookie", _cookie);
+        HttpResponseMessage response;
+        try
+        {
+            response = await client.GetAsync(url);
+            if(response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<UnifiAPIResponse>(content);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        return new UnifiAPIResponse();
+    }
+    public async Task<bool> PutPortForwardingAsync(UnifiAPIResponseData forwarding)
+    {
+        string url = $"https://{_host}/proxy/network/api/s/default/rest/portforward/{forwarding.Id}";
+        var client = new CustomHttpClient();
+        client.DefaultRequestHeaders.Add("Cookie", _cookie);
+        client.DefaultRequestHeaders.Add("X-CSRF-Token", _csrfToken);
+        var content = new StringContent(JsonSerializer.Serialize(forwarding), Encoding.UTF8, "application/json");
+        HttpResponseMessage response;
+        try
+        {
+            response = await client.PutAsync(url, content);
+            if(response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        return false;
+    }
     public async ValueTask DisposeAsync()
     {
         await LogoutAsync();
