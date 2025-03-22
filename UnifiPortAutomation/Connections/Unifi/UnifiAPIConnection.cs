@@ -11,9 +11,8 @@ public class UnifiAPIConnection : IAsyncDisposable
     private string _cookie;
     private string _csrfToken;
 
-    private UnifiAPIConnection(string host, string cookie, string csrfToken)
+    private UnifiAPIConnection(string cookie, string csrfToken)
     {
-        _host = host;
         _cookie = cookie;
         _csrfToken = csrfToken;
     }
@@ -21,7 +20,7 @@ public class UnifiAPIConnection : IAsyncDisposable
     {
         _host = host;
         var loginTokens = await LoginAsync(username, password);
-        UnifiAPIConnection connection = new UnifiAPIConnection(host, loginTokens.Item1, loginTokens.Item2);
+        UnifiAPIConnection connection = new UnifiAPIConnection(loginTokens.Item1, loginTokens.Item2);
         return connection;
     }
 
