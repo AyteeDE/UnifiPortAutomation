@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  unifiportautomation:
+    container_name: portautomation
+    image: ghcr.io/ayteede/unifiportautomation:main
+    restart: always
+    environment:
+      INTERVAL_MINUTES: 60
+      UNIFI_HOST: "127.0.0.1" # IP of your Unifi Controller
+      PORTAINER_HOST: "127.0.0.1:9443" # IP:Port of your main Portainer instance
+      UNIFI_USERNAME: "apiuser" # Username for the Unifi API
+      UNIFI_PASSWORD: "apipassword" # Password for the Unifi API
+      PORTAINER_TOKEN: "portainertoken" # User-Token for the Portainer API
+      PORTAINER_CONTAINER_CONFIGURATION: '[{"Name":"Container1","EnvironmentId":1,"Ports":[80,81,82]}, {"Name":"Container2","EnvironmentId":1,"Ports":[83]}]' # JSON Array with the Configuration-Class objects
