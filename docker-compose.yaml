@@ -2,7 +2,7 @@ version: '3'
 
 services:
   unifiportautomation:
-    container_name: portautomation
+    container_name: unifiportautomation
     image: ghcr.io/ayteede/unifiportautomation:main
     restart: always
     environment:
