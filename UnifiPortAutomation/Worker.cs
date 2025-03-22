@@ -24,15 +24,7 @@ public class Worker : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-            }
             await Run();
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Next run at: {time}", DateTimeOffset.Now.AddMilliseconds(_interval));
-            }
             await Task.Delay(_interval, stoppingToken);
         }
     }
@@ -67,7 +59,7 @@ public class Worker : BackgroundService
                 await unifiConnection.PutPortForwardingAsync(fwd);
                 if (_logger.IsEnabled(LogLevel.Information))
                 {
-                    _logger.LogInformation($"Port Forwarding for Port {fwd.Dst_Port} set to {(fwd.Enabled ? "enabled" : "disabled")}");
+                    _logger.LogInformation($"{DateTime.Now.ToString()}: Port Forwarding for Port {fwd.Dst_Port} set to {(fwd.Enabled ? "enabled" : "disabled")}");
                 }
             }
         }
