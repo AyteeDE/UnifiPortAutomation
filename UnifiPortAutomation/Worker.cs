@@ -31,39 +31,51 @@ public class Worker : BackgroundService
 
     private async Task Run()
     {
-        var containerConfigurationJson = Environment.GetEnvironmentVariable("PORTAINER_CONTAINER_CONFIGURATION");
-        List<Configuration> containerConfigurations = JsonSerializer.Deserialize<List<Configuration>>(containerConfigurationJson);
-        var usedEnvironments = GetUsedEnvironmentsForPortainer(containerConfigurations);
-
-        var unifiConnection = await Connections.Unifi.UnifiAPIConnection.CreateAsync(Environment.GetEnvironmentVariable("UNIFI_USERNAME"), Environment.GetEnvironmentVariable("UNIFI_PASSWORD"), Environment.GetEnvironmentVariable("UNIFI_HOST"));
-        var fwds = await unifiConnection.GetPortForwardingsAsync();
-
-        var portainerConnection = await Connections.Portainer.PortainerAPIConnection.CreateAsync(Environment.GetEnvironmentVariable("PORTAINER_HOST"), Environment.GetEnvironmentVariable("PORTAINER_TOKEN"));
-        List<PortainerContainerAPIResponse> containers = new List<PortainerContainerAPIResponse>();
-        foreach(var environmentId in usedEnvironments)
+        try
         {
-            var containersForEnvironment = await portainerConnection.GetRunningContainers(environmentId);
-            foreach(var container in containersForEnvironment)
-            {
-                container.EnvironmentId = environmentId;
-            }
-            containers.AddRange(containersForEnvironment);
-        }
+            var containerConfigurationJson = Environment.GetEnvironmentVariable("PORTAINER_CONTAINER_CONFIGURATION");
+            List<Configuration> containerConfigurations = JsonSerializer.Deserialize<List<Configuration>>(containerConfigurationJson);
+            var usedEnvironments = GetUsedEnvironmentsForPortainer(containerConfigurations);
 
-        foreach(var fwd in fwds.Data)
-        {
-            if(fwd.Enabled != CheckIfPortIsNeeded(fwd, containerConfigurations, containers))
+            var unifiConnection = await UnifiAPIConnection.CreateAsync(Environment.GetEnvironmentVariable("UNIFI_USERNAME"), Environment.GetEnvironmentVariable("UNIFI_PASSWORD"), Environment.GetEnvironmentVariable("UNIFI_HOST"));
+            var fwds = await unifiConnection.GetPortForwardingsAsync();
+
+            var portainerConnection = await PortainerAPIConnection.CreateAsync(Environment.GetEnvironmentVariable("PORTAINER_HOST"), Environment.GetEnvironmentVariable("PORTAINER_TOKEN"));
+            List<PortainerContainerAPIResponse> containers = new List<PortainerContainerAPIResponse>();
+            
+            foreach(var environmentId in usedEnvironments)
             {
-                //if current port status is different from needed port status, update to Unifi API
-                fwd.Enabled = !fwd.Enabled;
-                await unifiConnection.PutPortForwardingAsync(fwd);
-                if (_logger.IsEnabled(LogLevel.Information))
+                var containersForEnvironment = await portainerConnection.GetRunningContainers(environmentId);
+                foreach(var container in containersForEnvironment)
                 {
-                    _logger.LogInformation($"{DateTime.Now.ToString()}: Port Forwarding for Port {fwd.Dst_Port} set to {(fwd.Enabled ? "enabled" : "disabled")}");
+                    container.EnvironmentId = environmentId;
+                }
+                containers.AddRange(containersForEnvironment);
+            }
+
+            foreach(var fwd in fwds.Data)
+            {
+                if(fwd.Enabled != CheckIfPortIsNeeded(fwd, containerConfigurations, containers))
+                {
+                    //if current port status is different from needed port status, update to Unifi API
+                    fwd.Enabled = !fwd.Enabled;
+                    await unifiConnection.PutPortForwardingAsync(fwd);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation($"{DateTime.Now.ToString()}: Port Forwarding for Port {fwd.Dst_Port} set to {(fwd.Enabled ? "enabled" : "disabled")}");
+                    }
                 }
             }
+            await unifiConnection.DisposeAsync(); //Dispose connection to logout
         }
-        await unifiConnection.DisposeAsync(); //Dispose connection to logout
+        catch(Exception e)
+        {
+            if(_logger.IsEnabled(LogLevel.Error))
+            {
+                _logger.LogError($"{DateTime.Now.ToString()}: {e.Message}");
+            }
+            return;
+        }
     }
     private List<int> GetUsedEnvironmentsForPortainer(List<Configuration> containerConfigurations)
     {

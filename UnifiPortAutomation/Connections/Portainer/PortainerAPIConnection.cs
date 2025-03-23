@@ -1,5 +1,7 @@
 using System;
+using System.Net;
 using System.Net.Http.Headers;
+using System.Security;
 using System.Text;
 using System.Text.Json;
 
@@ -23,12 +25,30 @@ public class PortainerAPIConnection
     {
         string url = $"https://{_host}/api/endpoints/{environmentId}/docker/containers/json";
         var client = CreateClient();
-        var response = await client.GetAsync(url);
-        if(response.IsSuccessStatusCode)
+        try
         {
+            var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
             var responseContent = await response.Content.ReadAsStringAsync();
             var containers = JsonSerializer.Deserialize<List<PortainerContainerAPIResponse>>(responseContent);
             return containers;
+        }
+        catch(HttpRequestException e)
+        {
+            switch(e.StatusCode)
+            {
+                case HttpStatusCode.NotFound:
+                    throw new HttpRequestException("Environment not found. Please check your environmentId.");
+                case HttpStatusCode.Unauthorized:
+                    throw new HttpRequestException("Unauthorized access to Portainer API. Please check your access token.");
+                default: 
+                    throw new HttpRequestException("Portainer Host is not reachable under the given IP or port.", e);
+            }
+        }
+        catch(Exception e)
+        {
+            Console.WriteLine($"Error: {e.Message}");
         }
 
         return new List<PortainerContainerAPIResponse>();

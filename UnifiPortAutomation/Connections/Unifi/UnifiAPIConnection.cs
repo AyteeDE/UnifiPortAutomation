@@ -23,94 +23,75 @@ public class UnifiAPIConnection : IAsyncDisposable
         UnifiAPIConnection connection = new UnifiAPIConnection(loginTokens.Item1, loginTokens.Item2);
         return connection;
     }
-
+    private async static Task<HttpResponseMessage> SendAsync(HttpMethod httpMethod, string url, List<(string, string)> headers, HttpContent? content = null)
+    {
+        HttpRequestMessage request = new HttpRequestMessage(httpMethod, url);
+        request.Content = content;
+        foreach(var header in headers)
+        {
+            request.Headers.Add(header.Item1, header.Item2);
+        }
+        
+        var client = new CustomHttpClient();
+        try
+        {
+            var response = await client.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            return response;
+        }
+        catch(HttpRequestException e)
+        {
+            switch(e.StatusCode)
+            {
+                case HttpStatusCode.Unauthorized:
+                    throw new HttpRequestException("Unauthorized access to Unifi API. Please check your username, password and permissions.");
+                case HttpStatusCode.Forbidden:
+                    throw new HttpRequestException("Unauthorized access to Unifi API. Please check your username, password and permissions.");
+                default: 
+                    throw new HttpRequestException("Unifi Host is not reachable under the given IP.", e);
+            }
+        }
+        catch(Exception e)
+        {
+            throw new Exception(e.Message, e);
+        }
+    }
     private async static Task<(string, string)> LoginAsync(string username, string password)
     {
         (string?, string?) loginTokens = (null, null);
         string url = $"https://{_host}/api/auth/login";
-        var client = new CustomHttpClient();
         HttpContent content = new StringContent($"{{\"username\":\"{username}\",\"password\":\"{password}\"}}", Encoding.UTF8, "application/json");
-        HttpResponseMessage response;
-        try
-        {
-            response = await client.PostAsync(url, content);
-            if(response.IsSuccessStatusCode)
-            {
-                var cookieHeader = response.Headers.GetValues("Set-Cookie").FirstOrDefault();
-                loginTokens.Item1 = cookieHeader.Substring(0, cookieHeader.IndexOf(';'));;
-                loginTokens.Item2 = response.Headers.GetValues("X-CSRF-Token").FirstOrDefault();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
+        HttpResponseMessage response = await SendAsync(HttpMethod.Post, url, new List<(string, string)>(), content);
+
+        var cookieHeader = response.Headers.GetValues("Set-Cookie").FirstOrDefault();
+        loginTokens.Item1 = cookieHeader.Substring(0, cookieHeader.IndexOf(';'));;
+        loginTokens.Item2 = response.Headers.GetValues("X-CSRF-Token").FirstOrDefault();
         
         return loginTokens;
     }
     private async Task LogoutAsync()
     {
         string url = $"https://{_host}/api/auth/logout";
-        var client = new CustomHttpClient();
-        client.DefaultRequestHeaders.Add("Cookie", _cookie);
-        client.DefaultRequestHeaders.Add("X-CSRF-Token", _csrfToken);
-        HttpResponseMessage response;
-        try
-        {
-            response = await client.PostAsync(url, null);
-            if(response.IsSuccessStatusCode)
-            {
-                _cookie = null;
-                _csrfToken = null;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
+        List<(string, string)> headers = new List<(string, string)>{("Cookie", _cookie), ("X-CSRF-Token", _csrfToken)};
+        await SendAsync(HttpMethod.Post, url, headers);
+
+        _cookie = null;
+        _csrfToken = null;
     }
     public async Task<UnifiAPIResponse> GetPortForwardingsAsync()
     {
         string url = $"https://{_host}/proxy/network/api/s/default/rest/portforward";
-        var client = new CustomHttpClient();
-        client.DefaultRequestHeaders.Add("Cookie", _cookie);
-        HttpResponseMessage response;
-        try
-        {
-            response = await client.GetAsync(url);
-            if(response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<UnifiAPIResponse>(content);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
-        return new UnifiAPIResponse();
+        List<(string, string)> headers = new List<(string, string)>{("Cookie", _cookie)};
+        HttpResponseMessage response = await SendAsync(HttpMethod.Get, url, headers);
+        var content = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<UnifiAPIResponse>(content);
     }
-    public async Task<bool> PutPortForwardingAsync(UnifiAPIResponseData forwarding)
+    public async Task PutPortForwardingAsync(UnifiAPIResponseData forwarding)
     {
         string url = $"https://{_host}/proxy/network/api/s/default/rest/portforward/{forwarding.Id}";
-        var client = new CustomHttpClient();
-        client.DefaultRequestHeaders.Add("Cookie", _cookie);
-        client.DefaultRequestHeaders.Add("X-CSRF-Token", _csrfToken);
+        List<(string, string)> headers = new List<(string, string)>{("Cookie", _cookie), ("X-CSRF-Token", _csrfToken)};
         var content = new StringContent(JsonSerializer.Serialize(forwarding), Encoding.UTF8, "application/json");
-        HttpResponseMessage response;
-        try
-        {
-            response = await client.PutAsync(url, content);
-            if(response.IsSuccessStatusCode)
-            {
-                return true;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
-        return false;
+        await SendAsync(HttpMethod.Put, url, headers, content);
     }
     public async ValueTask DisposeAsync()
     {
