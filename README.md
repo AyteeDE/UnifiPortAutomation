@@ -13,6 +13,7 @@ It uses the Portainer and Unifi OS API.
 
 - Portainer installed on your homeserver
 - A running Unifi Controller
+- Existing (!!!) port-forwardings for the ports, this tool only enables / disables them. It will not create new rules.
 
 ## Quick Start
 
