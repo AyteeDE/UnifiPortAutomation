@@ -1,6 +1,6 @@
-# UnifiPortAutomation Docker Guide
+# UnifiPortAutomation Portainer (Docker Standalone) Guide
 
-This guide provides instructions on how to deploy and use UnifiPortAutomation using Portainer.
+This guide provides instructions on how to deploy and use UnifiPortAutomation using Portainer (Docker Standalone).
 
 ## Use Case
 
